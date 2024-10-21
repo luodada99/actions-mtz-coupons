@@ -1,11 +1,16 @@
-const semver = require('semver')
-const fetch = require('node-fetch')
+import semver from 'semver'
+import { readPkgJson } from './util/index.js'
+import request from './request.js'
+
+const { version: currentVersion } = readPkgJson()
 
 async function getLatestRelease(timeout = 5000) {
-  const res = await fetch(
+  const res = await request.get(
     'https://api.github.com/repos/vv314/actions-mtz-coupons/releases',
-    { timeout: timeout }
-  ).then((rep) => rep.json())
+    {
+      timeout: timeout
+    }
+  )
 
   const info = res.filter((e) => !e.draft || !e.prerelease)[0]
 
@@ -19,8 +24,6 @@ async function getLatestRelease(timeout = 5000) {
 }
 
 function getNotifyMessage(release) {
-  const currentVersion = require('../package.json').version
-
   const message = [
     `新版本就绪 ${currentVersion} → ${release.version}`,
     '',
@@ -33,17 +36,18 @@ function getNotifyMessage(release) {
 }
 
 async function checkUpdate(timeout) {
-  const currentVersion = require('../package.json').version
   let release
 
   try {
     release = await getLatestRelease(timeout)
   } catch (e) {
-    if (e.message.startsWith('network timeout')) {
-      e = '请求超时'
+    let errMsg = e.msg ?? e.message
+
+    if (e.code === request.ECODE.TIMEOUT) {
+      errMsg = '请求超时'
     }
 
-    throw '检查更新失败: ' + e
+    throw '检查更新失败: ' + errMsg
   }
 
   if (semver.gt(release.version, currentVersion)) {
@@ -53,4 +57,4 @@ async function checkUpdate(timeout) {
   return ''
 }
 
-module.exports = checkUpdate
+export default checkUpdate
